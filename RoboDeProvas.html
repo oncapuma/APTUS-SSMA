@@ -98,6 +98,8 @@
         <div class="t1">APTUS</div>
         <div class="t2">Teste digital</div>
         <div class="t2" id="onlineStatusBadge"></div>
+        <div class="t2" id="offlineReadyBadge"></div>
+        <div class="t2" id="connStatusBadge"></div>
       </div>
     </div>
     <div class="modeToggle" id="modeToggleWrap">
@@ -1502,6 +1504,24 @@ async function loadFirestoreSession() {
   render();
 }
 
+function marcarComoEnviado(sessionId, recordId){
+  const lista = STORE.submissions[sessionId] || [];
+  const alvo = lista.find(r => r.id === recordId);
+  if(alvo && alvo.enviado !== true){
+    alvo.enviado = true;
+    saveStore(STORE);
+    render();
+  }
+}
+
+function contarPendentes(){
+  let total = 0;
+  Object.keys(STORE.submissions||{}).forEach(sid=>{
+    (STORE.submissions[sid]||[]).forEach(r=>{ if(r.enviado === false) total += 1; });
+  });
+  return total;
+}
+
 async function syncFirestoreSubmissions(sessionId) {
   if (!FIREBASE_ENABLED || !db || !sessionId) return;
   try {
@@ -1609,8 +1629,9 @@ let importCsvHeaders = [];
 let importCsvRows = [];
 let importColumnMap = { nome:"", matricula:"", empresa:"", tempoEmpresa:"", tempoFuncao:"", gerenciaSupervisao:"", objetivo:"", nota:"", dataHora:"" };
 let formsImportNotice = "";
-let participant = { step:"intro", sessionId:null, current:0, answers:{}, nome:"", matricula:"", empresa:"", tempoEmpresa:"", tempoFuncao:"", gerenciaSupervisao:"", objetivo:"", result:null };
+let participant = { step:"intro", sessionId:null, current:0, answers:{}, nome:"", matricula:"", vinculo:"", empresa:"", tempoEmpresa:"", tempoFuncao:"", gerenciaSupervisao:"", objetivo:"", result:null };
 let resultsSessionId = null;
+let resultsFilterVinculo = "todos";
 let printSessionId = null;
 let presencaRows = 30;
 let pasteText = "";
@@ -1713,20 +1734,20 @@ function scoreSubmission(questions, answers){
 }
 
 function toCSV(rows){
-  const header = ["Nome","Matrícula","Empresa/Função","Tempo de Empresa","Tempo na Função","Gerência/Supervisão","Objetivo","Nota (%)","Acertos","Status","Data/Hora"];
+  const header = ["Nome","Matrícula","Vínculo","Empresa/Função","Tempo de Empresa","Tempo na Função","Gerência/Supervisão","Objetivo","Nota (%)","Acertos","Status","Data/Hora"];
   const lines = [header.join(";")];
   rows.forEach(r=>{
-    lines.push([r.nome, r.matricula||"", r.empresa, r.tempoEmpresa||"", r.tempoFuncao||"", r.gerenciaSupervisao||"", r.objetivo||"", r.pct.toFixed(1).replace(".",","), `${r.correct}/${r.total}`, r.aprovado?"APROVADO":"REPROVADO", new Date(r.timestamp).toLocaleString("pt-BR")]
+    lines.push([r.nome, r.matricula||"", r.vinculo==="vale"?"Vale":(r.vinculo==="contratada"?"Contratada":""), r.empresa, r.tempoEmpresa||"", r.tempoFuncao||"", r.gerenciaSupervisao||"", r.objetivo||"", r.pct.toFixed(1).replace(".",","), `${r.correct}/${r.total}`, r.aprovado?"APROVADO":"REPROVADO", new Date(r.timestamp).toLocaleString("pt-BR")]
       .map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";"));
   });
   return lines.join("\n");
 }
 function toCSVGeral(){
-  const header = ["Treinamento","Nome","Matrícula","Empresa/Função","Tempo de Empresa","Tempo na Função","Gerência/Supervisão","Objetivo","Nota (%)","Acertos","Status","Data/Hora"];
+  const header = ["Treinamento","Instrutor","Matrícula do Instrutor","Nome","Matrícula","Vínculo","Empresa/Função","Tempo de Empresa","Tempo na Função","Gerência/Supervisão","Objetivo","Nota (%)","Acertos","Status","Data/Hora"];
   const lines = [header.join(";")];
   STORE.sessions.forEach(s=>{
     (STORE.submissions[s.id]||[]).forEach(r=>{
-      lines.push([s.title, r.nome, r.matricula||"", r.empresa, r.tempoEmpresa||"", r.tempoFuncao||"", r.gerenciaSupervisao||"", r.objetivo||"", r.pct.toFixed(1).replace(".",","), `${r.correct}/${r.total}`, r.aprovado?"APROVADO":"REPROVADO", new Date(r.timestamp).toLocaleString("pt-BR")]
+      lines.push([s.title, s.instrutor||"", s.instrutorMatricula||"", r.nome, r.matricula||"", r.vinculo==="vale"?"Vale":(r.vinculo==="contratada"?"Contratada":""), r.empresa, r.tempoEmpresa||"", r.tempoFuncao||"", r.gerenciaSupervisao||"", r.objetivo||"", r.pct.toFixed(1).replace(".",","), `${r.correct}/${r.total}`, r.aprovado?"APROVADO":"REPROVADO", new Date(r.timestamp).toLocaleString("pt-BR")]
         .map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";"));
     });
   });
@@ -1780,12 +1801,11 @@ function renderParticipant(){
     </div>`;
   }
   if(participant.sessionId !== s.id){
-    participant = { step:"intro", sessionId:s.id, current:0, answers:{}, nome:"", matricula:"", empresa:"", tempoEmpresa:"", tempoFuncao:"", gerenciaSupervisao:"", objetivo:"", result:null };
+    participant = { step:"intro", sessionId:s.id, current:0, answers:{}, nome:"", matricula:"", vinculo:"", empresa:"", tempoEmpresa:"", tempoFuncao:"", gerenciaSupervisao:"", objetivo:"", result:null };
   }
   if(participant.step==="intro") return renderIntro(s);
   if(participant.step==="quiz") return renderQuiz(s);
   if(participant.step==="assinatura") return renderAssinatura(s);
-  if(participant.step==="lista") return renderListaPresenca(s);
   return renderDone(s);
 }
 
@@ -1796,6 +1816,7 @@ function renderIntro(s){
       <label>Objetivo do treinamento</label>
       ${s.objetivoOptions.map((o,i)=>`<div class="qopt ${participant.objetivo===o?'selected':''}" data-objopt="${i}">${esc(o)}</div>`).join("")}
     </div>` : "";
+  const vinculo = participant.vinculo;
   return `<div class="card">
     <div style="color:${TEAL};font-size:12px;font-weight:bold;text-transform:uppercase;">${esc(s.codigo||"Treinamento")}</div>
     <h2>${esc(s.title)}</h2>
@@ -1805,8 +1826,13 @@ function renderIntro(s){
       <input type="text" id="pNome" value="${esc(participant.nome)}" placeholder="Seu nome">
       <label>Matrícula *</label>
       <input type="text" id="pMatricula" value="${esc(participant.matricula)}">
-      <label>Empresa / Função *</label>
-      <input type="text" id="pEmpresa" value="${esc(participant.empresa)}" placeholder="Ex.: Manserv — Eletricista">
+      <label>Vínculo *</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <div class="qopt ${vinculo==='vale'?'selected':''}" data-vinculo="vale" style="margin-bottom:0;text-align:center;">Vale (empregado próprio)</div>
+        <div class="qopt ${vinculo==='contratada'?'selected':''}" data-vinculo="contratada" style="margin-bottom:0;text-align:center;">Contratada</div>
+      </div>
+      <label>${vinculo==='vale'?"Gerência / Função *":"Empresa contratada / Função *"}</label>
+      <input type="text" id="pEmpresa" value="${esc(participant.empresa)}" placeholder="${vinculo==='vale'?"Ex.: Manutenção — Eletricista":"Ex.: Manserv — Eletricista"}">
       <label>Tempo de empresa *</label>
       <input type="text" id="pTempoEmpresa" value="${esc(participant.tempoEmpresa)}" placeholder="Ex.: 2 anos">
       <label>Tempo na função *</label>
@@ -1872,24 +1898,8 @@ function renderDone(s){
     <div class="muted">${r.correct} de ${r.total} acertos</div>
     <div class="badge ${r.aprovado?'badge-green':'badge-red'}" style="margin-top:10px;font-size:12px;padding:6px 14px;">${r.aprovado?"APROVADO":"REPROVADO"}</div>
     <div class="footNote">Presença e nota registradas automaticamente. Obrigado, ${esc((r.nome||"").split(" ")[0]||"")}.</div>
-    <button class="btn btn-outline" id="verPresencaBtn" style="margin-top:16px;">&#128203; Ver lista de presença</button>
-  </div>`;
-}
-
-function renderListaPresenca(s){
-  const subs = STORE.submissions[s.id]||[];
-  const rows = subs.length ? `<table><thead><tr><th>Nome</th><th>Empresa/Função</th><th>Status</th></tr></thead><tbody>
-      ${subs.map(x=>`<tr>
-        <td>${esc(x.nome)}</td><td>${esc(x.empresa)}</td>
-        <td><span class="badge ${x.aprovado?'badge-green':'badge-red'}">${x.aprovado?"APROVADO":"REPROVADO"}</span></td>
-      </tr>`).join("")}
-    </tbody></table>` : `<div class="muted">Ninguém registrado ainda nesta sessão.</div>`;
-  return `<div class="card">
-    <div style="color:${TEAL};font-size:12px;font-weight:bold;text-transform:uppercase;">${esc(s.codigo||"Treinamento")}</div>
-    <h2>${esc(s.title)}</h2>
-    <div class="muted" style="margin-bottom:14px;">${subs.length} pessoa(s) registrada(s) nesta sessão.</div>
-    ${rows}
-    <button class="btn btn-outline btn-block" id="voltarDoResultadoBtn" style="margin-top:16px;">&#8592; Voltar</button>
+    <div class="footNote" style="margin-top:10px;">Seu resultado é individual — apenas o instrutor vê o resultado da turma.</div>
+    ${r.enviado === false ? `<div class="footNote" style="margin-top:10px;background:#FFFBEB;color:#92400e;padding:10px;border-radius:8px;">&#9888; Sem internet no momento. Sua nota já está registrada neste aparelho e será enviada automaticamente assim que a conexão voltar — <b>não feche nem apague o app antes disso</b>.</div>` : ""}
   </div>`;
 }
 
@@ -1929,12 +1939,29 @@ function renderHistorico(){
       <td>${esc(r.s.instrutor||"—")}</td>
       <td>${r.total}</td>
       <td>${r.aprov} / ${r.total-r.aprov}</td>
-      <td><button class="btn btn-teal" data-listaoficial="${r.s.id}" style="padding:3px 8px;font-size:11px;">&#128196; Lista oficial</button></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-teal" data-listaoficial="${r.s.id}" data-lvinculo="todos" style="padding:3px 7px;font-size:10.5px;" title="Lista oficial completa (Vale + Contratadas)">&#128196; Completa</button>
+        <button class="btn btn-outline" data-listaoficial="${r.s.id}" data-lvinculo="vale" style="padding:3px 7px;font-size:10.5px;" title="Somente empregados Vale">Vale</button>
+        <button class="btn btn-outline" data-listaoficial="${r.s.id}" data-lvinculo="contratada" style="padding:3px 7px;font-size:10.5px;" title="Somente empresas contratadas">Contratada</button>
+      </td>
       <td><button class="btn btn-outline" data-delsession="${r.s.id}" style="padding:3px 8px;font-size:11px;color:#dc2626;border-color:#fecaca;">&#128465; Apagar</button></td>
     </tr>`).join("")}
     </tbody></table>` : `<div class="muted">Nenhuma sessão criada ainda neste computador/navegador.</div>`;
 
+  const pendentes = contarPendentes();
+  const filaHtml = !FIREBASE_ENABLED ? "" : (pendentes > 0
+    ? `<div class="card soft" style="background:#FFFBEB;border-color:#fde68a;">
+        <div style="font-weight:bold;color:#b45309;margin-bottom:2px;">&#9888; ${pendentes} resposta(s) ainda na fila deste aparelho</div>
+        <div class="muted" style="color:#92400e;">Foram respondidas sem internet e ainda não subiram para o servidor. Assim que este aparelho tiver conexão, elas sobem sozinhas — não é preciso fazer nada.</div>
+        <div class="footNote" style="color:#92400e;">Atenção: esta contagem é só deste aparelho. Provas respondidas no celular de outra pessoa só aparecem aqui depois que o celular <b>dela</b> reconectar.</div>
+      </div>`
+    : `<div class="card soft" style="background:#ECFDF5;border-color:#bbf7d0;">
+        <div style="font-weight:bold;color:#15803d;">&#10003; Nenhuma resposta pendente neste aparelho</div>
+        <div class="muted" style="color:#166534;">Tudo que foi respondido aqui já subiu para o servidor.</div>
+      </div>`);
+
   return `
+  ${filaHtml}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
       <div style="font-weight:bold;">Histórico completo</div>
@@ -2244,14 +2271,19 @@ function renderMontar(s){
 
 
 function renderResultados(){
-  const subs = resultsSessionId ? (STORE.submissions[resultsSessionId]||[]) : [];
+  const allSubs = resultsSessionId ? (STORE.submissions[resultsSessionId]||[]) : [];
+  const subs = resultsFilterVinculo==="todos" ? allSubs : allSubs.filter(s=>s.vinculo===resultsFilterVinculo);
   const aprovados = subs.filter(s=>s.aprovado).length;
+  const countVale = allSubs.filter(s=>s.vinculo==="vale").length;
+  const countContratada = allSubs.filter(s=>s.vinculo==="contratada").length;
   const options = STORE.sessions.map(s=>`<option value="${s.id}" ${resultsSessionId===s.id?"selected":""}>${esc(s.title)} — ${new Date(s.createdAt).toLocaleDateString("pt-BR")}</option>`).join("");
-  let tableHtml = `<div class="muted">Ninguém enviou a prova ainda nesta sessão.</div>`;
+  let tableHtml = `<div class="muted">Ninguém enviou a prova ainda nesta sessão${resultsFilterVinculo!=="todos"?" com esse vínculo":""}.</div>`;
   if(subs.length){
-    tableHtml = `<table><thead><tr><th>Nome</th><th>Empresa/Função</th><th>Nota</th><th>Status</th><th>Hora</th><th></th><th></th></tr></thead><tbody>
+    tableHtml = `<table><thead><tr><th>Nome</th><th>Vínculo</th><th>Empresa/Função</th><th>Nota</th><th>Status</th><th>Hora</th><th></th><th></th></tr></thead><tbody>
       ${subs.map(s=>`<tr>
-        <td>${esc(s.nome)}</td><td>${esc(s.empresa)}</td><td>${s.pct.toFixed(1)}%</td>
+        <td>${esc(s.nome)}</td>
+        <td><span class="badge ${s.vinculo==='vale'?'badge-vale-yellow':'badge-teal'}">${s.vinculo==='vale'?'VALE':'CONTRATADA'}</span></td>
+        <td>${esc(s.empresa)}</td><td>${s.pct.toFixed(1)}%</td>
         <td><span class="badge ${s.aprovado?'badge-green':'badge-red'}">${s.aprovado?"APROVADO":"REPROVADO"}</span></td>
         <td>${new Date(s.timestamp).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</td>
         <td><button class="btn btn-outline" data-comprovante="${s.id}" style="padding:3px 8px;font-size:10.5px;" title="Comprovante">&#128196;</button></td>
@@ -2265,6 +2297,12 @@ function renderResultados(){
     <select id="resultsSessionPicker"><option value="">Selecione uma sessão...</option>${options}</select>
   </div>
   ${resultsSessionId?`<div class="card">
+    <label>Filtrar por vínculo</label>
+    <div class="tabbar" style="margin-bottom:14px;">
+      <button data-vinculofilter="todos" class="${resultsFilterVinculo==='todos'?'active':''}">Todos (${allSubs.length})</button>
+      <button data-vinculofilter="vale" class="${resultsFilterVinculo==='vale'?'active':''}">Vale (${countVale})</button>
+      <button data-vinculofilter="contratada" class="${resultsFilterVinculo==='contratada'?'active':''}">Contratada (${countContratada})</button>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <div class="pill-row" style="margin-top:0;">
         <span class="pill badge-teal">${subs.length} presentes</span>
@@ -2295,7 +2333,7 @@ function renderImprimir(){
 }
 
 // ======================= PRINT LAYER =======================
-function buildPrintLayer(session, view, submission){
+function buildPrintLayer(session, view, submission, opts){
   const layer = document.getElementById("printLayer");
   if(!session){ layer.innerHTML=""; return; }
   let html = `<div class="printHead" style="display:flex;justify-content:space-between;">
@@ -2332,6 +2370,7 @@ function buildPrintLayer(session, view, submission){
       <div class="printGrid" style="border:none;padding:0;margin-bottom:6px;">
         <div><b>Nome:</b> ${esc(s.nome)}</div>
         <div><b>Matrícula:</b> ${s.matricula?esc(s.matricula):"—"}</div>
+        <div><b>Vínculo:</b> ${s.vinculo==="vale"?"Vale (empregado próprio)":(s.vinculo==="contratada"?"Empresa contratada":"—")}</div>
         <div><b>Empresa / Função:</b> ${esc(s.empresa)}</div>
         <div><b>Objetivo do treinamento:</b> ${s.objetivo?esc(s.objetivo):"—"}</div>
         <div><b>Tempo de empresa:</b> ${esc(s.tempoEmpresa||"—")}</div>
@@ -2344,7 +2383,7 @@ function buildPrintLayer(session, view, submission){
       <div class="printGrid" style="border:none;padding:0;margin-bottom:6px;">
         <div><b>Treinamento:</b> ${esc(session.title)}</div>
         <div><b>Código:</b> ${esc(session.codigo||"—")}</div>
-        <div><b>Instrutor:</b> ${esc(session.instrutor||"—")}</div>
+        <div><b>Instrutor:</b> ${esc(session.instrutor||"—")}${session.instrutorMatricula?` (matr. ${esc(session.instrutorMatricula)})`:""}</div>
         <div><b>Local / Turno:</b> ${esc(session.local||"—")}</div>
         <div><b>Carga Horária:</b> ${esc(session.cargaHoraria||"—")}</div>
         <div><b>Data/Hora da realização:</b> ${dataHora}</div>
@@ -2397,6 +2436,7 @@ function buildPrintLayer(session, view, submission){
   } else if(view==="presenca-oficial"){
     const subs = STORE.submissions[session.id]||[];
     const dataSessao = new Date(session.createdAt).toLocaleDateString("pt-BR");
+    const filtro = (opts && opts.vinculo) || "todos";
     html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Anexo 01 — Registro de Treinamento (lista oficial, preenchida automaticamente)</div>
     <div class="printGrid">
       <div><b>Treinamento:</b> ${esc(session.title)}</div>
@@ -2404,30 +2444,50 @@ function buildPrintLayer(session, view, submission){
       <div><b>Turno/Local:</b> ${session.local?esc(session.local):"________________"}</div>
       <div><b>Período:</b> ${dataSessao}</div>
       <div><b>Carga Horária:</b> ${esc(session.cargaHoraria||"________")}</div>
-      <div><b>Fonte/Instrutor:</b> ${session.instrutor?esc(session.instrutor):"________________________"}${session.instrutorMatricula?` (matr. ${esc(session.instrutorMatricula)})`:""}</div>
-      ${session.conteudo?`<div style="grid-column:1/3;"><b>Conteúdo:</b> ${esc(session.conteudo)}</div>`:""}
-    </div>
-    <table class="presTable"><thead><tr>
-      <th style="width:26px;">Nº</th><th style="width:85px;">Matrícula</th><th>Nome (Legível)</th>
-      <th style="width:100px;">Assinatura</th><th>Gerência / Empresa Contratada</th><th style="width:45px;">Nota</th>
-    </tr></thead><tbody>`;
-    if(subs.length){
-      subs.forEach((sub,i)=>{
-        const empresaCol = sub.empresa + (sub.gerenciaSupervisao ? ` — ${sub.gerenciaSupervisao}` : "");
-        html += `<tr>
-          <td style="text-align:center;color:#888;">${i+1}</td>
-          <td>${esc(sub.matricula||"")}</td>
-          <td>${esc(sub.nome)}</td>
-          <td style="text-align:center;">${sub.assinatura ? `<img src="${sub.assinatura}" style="height:32px;max-width:95px;">` : ""}</td>
-          <td>${esc(empresaCol)}</td>
-          <td style="text-align:center;">${sub.pct.toFixed(1)}%</td>
-        </tr>`;
-      });
+      <div><b>Fonte/Instrutor:</b> ${session.instrutor?esc(session.instrutor):"________________________"}</div>
+      <div><b>Matrícula do instrutor:</b> ${session.instrutorMatricula?esc(session.instrutorMatricula):"________________"}</div>
+      ${session.conteudo?`<div><b>Conteúdo:</b> ${esc(session.conteudo)}</div>`:"<div></div>"}
+    </div>`;
+
+    const renderBloco = (titulo, lista, colLabel)=>{
+      let bloco = `<div style="font-size:12px;font-weight:bold;color:#0B1220;margin:14px 0 6px;text-transform:uppercase;">${titulo} — ${lista.length} participante(s)</div>
+      <table class="presTable"><thead><tr>
+        <th style="width:26px;">Nº</th><th style="width:85px;">Matrícula</th><th>Nome (Legível)</th>
+        <th style="width:100px;">Assinatura</th><th>${colLabel}</th><th style="width:45px;">Nota</th>
+      </tr></thead><tbody>`;
+      if(lista.length){
+        lista.forEach((sub,i)=>{
+          const empresaCol = sub.empresa + (sub.gerenciaSupervisao ? ` — ${sub.gerenciaSupervisao}` : "");
+          bloco += `<tr>
+            <td style="text-align:center;color:#888;">${i+1}</td>
+            <td>${esc(sub.matricula||"")}</td>
+            <td>${esc(sub.nome)}</td>
+            <td style="text-align:center;">${sub.assinatura ? `<img src="${sub.assinatura}" style="height:32px;max-width:95px;">` : ""}</td>
+            <td>${esc(empresaCol)}</td>
+            <td style="text-align:center;">${sub.pct.toFixed(1)}%</td>
+          </tr>`;
+        });
+      } else {
+        bloco += `<tr><td colspan="6" style="text-align:center;color:#888;padding:12px;">Nenhum participante nesta categoria.</td></tr>`;
+      }
+      bloco += `</tbody></table>`;
+      return bloco;
+    };
+
+    const listaVale = subs.filter(x=>x.vinculo==="vale");
+    const listaContratada = subs.filter(x=>x.vinculo==="contratada");
+    const listaSemVinculo = subs.filter(x=>x.vinculo!=="vale" && x.vinculo!=="contratada");
+
+    if(filtro==="vale"){
+      html += renderBloco("Empregados Vale", listaVale, "Gerência");
+    } else if(filtro==="contratada"){
+      html += renderBloco("Empresas Contratadas", listaContratada, "Empresa Contratada");
     } else {
-      html += `<tr><td colspan="6" style="text-align:center;color:#888;padding:12px;">Ninguém respondeu esta sessão ainda.</td></tr>`;
+      html += renderBloco("Empregados Vale", listaVale, "Gerência");
+      html += renderBloco("Empresas Contratadas", listaContratada, "Empresa Contratada");
+      if(listaSemVinculo.length) html += renderBloco("Sem vínculo informado", listaSemVinculo, "Gerência / Empresa");
     }
-    html += `</tbody></table>
-    <div style="font-size:10px;color:#666;margin-top:8px;">Lista gerada automaticamente a partir das provas respondidas no Aptus — ${subs.length} registro(s).</div>`;
+    html += `<div style="font-size:10px;color:#666;margin-top:8px;">Lista gerada automaticamente a partir das provas respondidas no Aptus — ${subs.length} registro(s) no total.</div>`;
   } else {
     html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Anexo 01 — Registro de Treinamento</div>
     <div class="printGrid">
@@ -2467,11 +2527,15 @@ function attachHandlers(){
     document.querySelectorAll("[data-objopt]").forEach(el=>{
       el.onclick = ()=>{ const s=activeSession(); participant.objetivo = s.objetivoOptions[Number(el.dataset.objopt)]; render(); };
     });
+    document.querySelectorAll("[data-vinculo]").forEach(el=>{
+      el.onclick = ()=>{ participant.vinculo = el.dataset.vinculo; render(); };
+    });
     startQuizBtn.onclick = ()=>{
       const s = activeSession();
       const needsObj = (s.objetivoOptions||[]).length>0;
       if(!participant.nome.trim() || !participant.empresa.trim()) return alert("Preencha nome e empresa.");
       if(!participant.matricula.trim()) return alert("Preencha a matrícula.");
+      if(!participant.vinculo) return alert("Selecione o vínculo: Vale ou Contratada.");
       if(!participant.tempoEmpresa.trim()) return alert("Preencha o tempo de empresa.");
       if(!participant.tempoFuncao.trim()) return alert("Preencha o tempo na função.");
       if(!participant.gerenciaSupervisao.trim()) return alert("Preencha a gerência/supervisão.");
@@ -2524,12 +2588,20 @@ function attachHandlers(){
       const { correct, total, pct } = scoreSubmission(s.questions, participant.answers);
       const aprovado = pct >= s.passMark;
       const respostas = s.questions.map(q => (participant.answers[q.id] !== undefined ? participant.answers[q.id] : null));
-      const record = { id: uid(), nome:participant.nome.trim(), matricula:participant.matricula.trim(), empresa:participant.empresa.trim(), tempoEmpresa:participant.tempoEmpresa.trim(), tempoFuncao:participant.tempoFuncao.trim(), gerenciaSupervisao:participant.gerenciaSupervisao.trim(), objetivo:participant.objetivo, correct, total, pct, aprovado, assinatura: assinatura||"", respostas, timestamp:Date.now() };
+      const record = { id: uid(), nome:participant.nome.trim(), matricula:participant.matricula.trim(), vinculo:participant.vinculo, empresa:participant.empresa.trim(), tempoEmpresa:participant.tempoEmpresa.trim(), tempoFuncao:participant.tempoFuncao.trim(), gerenciaSupervisao:participant.gerenciaSupervisao.trim(), objetivo:participant.objetivo, correct, total, pct, aprovado, assinatura: assinatura||"", respostas, timestamp:Date.now() };
       if(!STORE.submissions[s.id]) STORE.submissions[s.id]=[];
       STORE.submissions[s.id].push(record);
       saveStore(STORE);
       if(FIREBASE_ENABLED && db){
-        db.collection("aptus_submissions").add({ ...record, sessionId: s.id }).catch(e=>console.error("Erro ao enviar resposta ao Firestore:", e));
+        // enviado=false marca que ainda está na fila deste aparelho.
+        // O .then() só dispara quando o servidor confirma o recebimento.
+        record.enviado = false;
+        saveStore(STORE);
+        db.collection("aptus_submissions").add({ ...record, sessionId: s.id })
+          .then(()=>{ marcarComoEnviado(s.id, record.id); })
+          .catch(e=>console.error("Erro ao enviar resposta ao Firestore:", e));
+      } else {
+        record.enviado = true;
       }
       participant.result = record; participant.step="done"; render();
     };
@@ -2544,15 +2616,6 @@ function attachHandlers(){
     const signatureSkipBtn = document.getElementById("signatureSkipBtn");
     if(signatureSkipBtn) signatureSkipBtn.onclick = ()=>{ finishSubmission(""); };
   }
-  const verPresencaBtn = document.getElementById("verPresencaBtn");
-  if(verPresencaBtn) verPresencaBtn.onclick = ()=>{
-    const sess = activeSession();
-    participant.step="lista"; render();
-    if(FIREBASE_ENABLED && db && sess) syncFirestoreSubmissions(sess.id);
-  };
-  const voltarDoResultadoBtn = document.getElementById("voltarDoResultadoBtn");
-  if(voltarDoResultadoBtn) voltarDoResultadoBtn.onclick = ()=>{ participant.step="done"; render(); };
-
   // --- admin: montar ---
   const templatePicker = document.getElementById("templatePicker");
   if(templatePicker) templatePicker.onchange = e=>{
@@ -2692,6 +2755,9 @@ function attachHandlers(){
     const subs = STORE.submissions[resultsSessionId]||[];
     downloadText(`lista_presenca_${resultsSessionId}.csv`, toCSV(subs));
   };
+  document.querySelectorAll("[data-vinculofilter]").forEach(btn=>{
+    btn.onclick = ()=>{ resultsFilterVinculo = btn.dataset.vinculofilter; render(); };
+  });
   document.querySelectorAll("[data-comprovante]").forEach(btn=>{
     btn.onclick = ()=>{
       const sess = STORE.sessions.find(x=>x.id===resultsSessionId);
@@ -2737,7 +2803,7 @@ function attachHandlers(){
   };
 
   // --- tabbar ---
-  document.querySelectorAll(".tabbar button").forEach(btn=>{
+  document.querySelectorAll(".tabbar button[data-tab]").forEach(btn=>{
     btn.onclick = ()=>{ adminTab = btn.dataset.tab; render(); };
   });
 
@@ -2746,7 +2812,7 @@ function attachHandlers(){
     btn.onclick = ()=>{
       const sess = STORE.sessions.find(s=>s.id===btn.dataset.listaoficial);
       if(!sess) return;
-      buildPrintLayer(sess, "presenca-oficial");
+      buildPrintLayer(sess, "presenca-oficial", null, { vinculo: btn.dataset.lvinculo || "todos" });
       setTimeout(()=>window.print(), 200);
     };
   });
@@ -2964,6 +3030,32 @@ if(statusBadge){
     : `<span style="color:#94a3b8;">Modo local (sem sincronização online)</span>`;
 }
 loadFirestoreSession();
+
+// ---- Suporte offline: registra o Service Worker ----
+// Guarda uma cópia do Aptus no aparelho, para que ele abra mesmo sem internet.
+// Só funciona quando o app é servido por https:// (ex.: GitHub Pages), não em file://
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(() => {
+        const badge = document.getElementById("offlineReadyBadge");
+        if (badge) badge.innerHTML = `<span style="color:#16a34a;font-weight:bold;">&#9679; Dispon\u00edvel offline</span>`;
+      })
+      .catch((err) => console.warn("Service Worker n\u00e3o p\u00f4de ser registrado:", err));
+  });
+}
+
+// ---- Aviso visual de conexão ----
+function updateConnBadge(){
+  const el = document.getElementById("connStatusBadge");
+  if(!el) return;
+  el.innerHTML = navigator.onLine
+    ? ""
+    : `<span style="color:#b45309;font-weight:bold;">&#9679; Sem internet \u2014 respostas ser\u00e3o enviadas quando a conex\u00e3o voltar</span>`;
+}
+window.addEventListener("online", updateConnBadge);
+window.addEventListener("offline", updateConnBadge);
+updateConnBadge();
 </script>
 </body>
 </html>
