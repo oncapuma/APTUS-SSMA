@@ -1548,6 +1548,40 @@ async function syncFirestoreSubmissions(sessionId) {
   }
 }
 
+// Traz para este computador TODAS as sessões já criadas por qualquer
+// instrutor (não só as que já existem localmente), e depois as respostas
+// de cada uma. É isso que faz o botão "Sincronizar" enxergar o trabalho
+// de outros instrutores — mesmo sessões ainda abertas.
+async function syncAllSessionsFromFirestore() {
+  if (!FIREBASE_ENABLED || !db) return { novasSessoes: 0, novasRespostas: 0 };
+  let novasSessoes = 0;
+  try {
+    const snap = await db.collection("aptus_sessions").get();
+    const existingIds = new Set(STORE.sessions.map((s) => s.id));
+    snap.forEach((doc) => {
+      const d = doc.data();
+      if (!existingIds.has(d.id)) {
+        STORE.sessions.push(d);
+        existingIds.add(d.id);
+        novasSessoes += 1;
+      }
+    });
+    if (novasSessoes) {
+      STORE.sessions.sort((a, b) => b.createdAt - a.createdAt);
+      saveStore(STORE);
+    }
+  } catch (e) {
+    console.error("Erro ao buscar sessões de outros instrutores:", e);
+  }
+
+  const antesTotal = Object.values(STORE.submissions).reduce((n, arr) => n + arr.length, 0);
+  for (const sess of STORE.sessions) {
+    await syncFirestoreSubmissions(sess.id);
+  }
+  const depoisTotal = Object.values(STORE.submissions).reduce((n, arr) => n + arr.length, 0);
+  return { novasSessoes, novasRespostas: depoisTotal - antesTotal };
+}
+
 // ======================= STORAGE (localStorage — this browser only) =======================
 const STORE_KEY = "robo_provas_v1";
 function loadStore(){
@@ -2930,15 +2964,21 @@ function attachHandlers(){
     e.target.value = "";
   };
 
-  // --- importar do Microsoft Forms ---
   const syncAllFirestoreBtn = document.getElementById("syncAllFirestoreBtn");
   if(syncAllFirestoreBtn) syncAllFirestoreBtn.onclick = async ()=>{
     syncAllFirestoreBtn.disabled = true;
-    syncAllFirestoreBtn.textContent = "Sincronizando...";
-    for(const sess of STORE.sessions){
-      await syncFirestoreSubmissions(sess.id);
+    const textoOriginal = syncAllFirestoreBtn.innerHTML;
+    syncAllFirestoreBtn.innerHTML = "Sincronizando...";
+    const { novasSessoes, novasRespostas } = await syncAllSessionsFromFirestore();
+    render();
+    if(novasSessoes === 0 && novasRespostas === 0){
+      alert("Tudo já estava atualizado — nenhuma sessão ou resposta nova de outros instrutores.");
+    } else {
+      alert(`Sincronizado: ${novasSessoes} sessão(ões) nova(s) de outros instrutores, ${novasRespostas} resposta(s) nova(s).`);
     }
   };
+
+
 
   const toggleFormsImportBtn = document.getElementById("toggleFormsImportBtn");
   if(toggleFormsImportBtn) toggleFormsImportBtn.onclick = ()=>{ formsImportVisible = !formsImportVisible; render(); };
