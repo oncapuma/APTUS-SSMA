@@ -100,7 +100,7 @@
         <div class="t2" id="onlineStatusBadge"></div>
         <div class="t2" id="offlineReadyBadge"></div>
         <div class="t2" id="connStatusBadge"></div>
-        <div class="t2" style="opacity:.7;font-size:10px;">Versão 22/10/2026-C</div>
+        <div class="t2" style="opacity:.7;font-size:10px;">Versão 22/10/2026-D</div>
       </div>
     </div>
     <div class="modeToggle" id="modeToggleWrap">
@@ -1678,6 +1678,7 @@ const ADMIN_PIN = "onca2026";
 // ======================= STATE =======================
 let mode = "participante";
 let adminTab = "montar";
+let pdfTreinoTitulo = "";
 let draft = null; // current prova being built/edited by admin
 let draftCustomId = null; // set when the draft is bound to a saved custom template (Salvar modelo updates it in place)
 let saveModelNotice = "";
@@ -2065,6 +2066,19 @@ function renderHistorico(){
       <button class="btn btn-outline" id="exportAllCsvBtn" ${totalGeral?"":"disabled"}>&#8659; Exportar CSV geral (todas as provas)</button>
       <button class="btn btn-teal" id="pdfAllListasBtn" ${STORE.sessions.length?"":"disabled"}>&#128196; PDF: todas as listas de presença</button>
       <button class="btn btn-teal" id="pdfAllProvasBtn" ${totalGeral?"":"disabled"}>&#128196; PDF: todas as provas respondidas</button>
+    </div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
+      <div style="font-weight:bold;font-size:12px;margin-bottom:6px;">&#128196; PDF por treinamento (junta todas as turmas do mesmo treinamento)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="pdfTreinoSel" style="flex:1;min-width:220px;">
+          <option value="">Escolha o treinamento...</option>
+          ${[...new Set(STORE.sessions.map(s=>s.title))].sort().map(t=>`<option value="${esc(t)}" ${pdfTreinoTitulo===t?"selected":""}>${esc(t)} (${STORE.sessions.filter(s=>s.title===t).length} turma(s))</option>`).join("")}
+        </select>
+        <button class="btn btn-teal" id="pdfTreinoListasBtn">Listas de presença</button>
+        <button class="btn btn-teal" id="pdfTreinoProvasBtn">Provas respondidas</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
       <label class="btn btn-teal" style="cursor:pointer;color:white;">
         &#8657; Juntar backup de outro computador
         <input type="file" id="importMergeInput" accept="application/json" style="display:none;">
@@ -2980,6 +2994,23 @@ function attachHandlers(){
     const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,"-");
     a.href = url; a.download = `robo_provas_backup_${stamp}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+  const pdfTreinoSel = document.getElementById("pdfTreinoSel");
+  if(pdfTreinoSel) pdfTreinoSel.onchange = e=>{ pdfTreinoTitulo = e.target.value; };
+  const sessoesDoTreino = ()=> STORE.sessions.filter(s=>s.title===pdfTreinoTitulo).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const pdfTreinoListasBtn = document.getElementById("pdfTreinoListasBtn");
+  if(pdfTreinoListasBtn) pdfTreinoListasBtn.onclick = ()=>{
+    if(!pdfTreinoTitulo){ alert("Escolha o treinamento primeiro."); return; }
+    const jobs = sessoesDoTreino().map(s=>[s, "presenca-oficial", null, {vinculo:"todos"}]);
+    imprimirLote(jobs, `${jobs.length} lista(s) de presença de "${pdfTreinoTitulo}".`);
+  };
+  const pdfTreinoProvasBtn = document.getElementById("pdfTreinoProvasBtn");
+  if(pdfTreinoProvasBtn) pdfTreinoProvasBtn.onclick = ()=>{
+    if(!pdfTreinoTitulo){ alert("Escolha o treinamento primeiro."); return; }
+    let jobs = [];
+    sessoesDoTreino().forEach(s=>{ jobs = jobs.concat(jobsProvas(s, STORE.submissions[s.id])); });
+    if(!jobs.length){ alert("Não há provas respondidas desse treinamento."); return; }
+    imprimirLote(jobs, `${jobs.length} prova(s) respondida(s) de "${pdfTreinoTitulo}".`);
   };
   const pdfAllListasBtn = document.getElementById("pdfAllListasBtn");
   if(pdfAllListasBtn) pdfAllListasBtn.onclick = ()=>{
