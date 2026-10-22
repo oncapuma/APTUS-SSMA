@@ -2,7 +2,7 @@
 // Guarda uma cópia do app no próprio aparelho, para que ele abra mesmo SEM internet.
 // As respostas ficam na fila do Firestore e sobem sozinhas quando a conexão voltar.
 
-const CACHE = "aptus-v2";
+const CACHE = "aptus-v3";
 
 const ARQUIVOS = [
   "./RoboDeProvas.html",
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   // Abrir a pagina: tenta a rede, cai para a copia guardada.
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-store" }) // sempre busca a versão mais nova no servidor
         .then((res) => {
           const copia = res.clone();
           caches.open(CACHE).then((c) => c.put("./RoboDeProvas.html", copia)).catch(() => {});
