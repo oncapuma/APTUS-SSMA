@@ -81,6 +81,24 @@
   .print-only{display:none;}
   .printHead{border-bottom:2px solid var(--teal);padding-bottom:10px;margin-bottom:16px;}
   .printGrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:12px;border:1px solid #999;padding:10px;margin-bottom:14px;}
+  @page lista{size:A4 landscape;margin:6mm;}
+  .rgPage{page:lista;font-family:Arial,Helvetica,sans-serif;color:#000;width:100%;}
+  .rgPage .rgBar{background:#007E7A;color:#fff;display:flex;align-items:center;border:1px solid #333;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .rgPage .rgBar img{height:11mm;margin:1.5mm 4mm;}
+  .rgPage .rgBar .rgTit{flex:1;text-align:center;padding-right:30mm;}
+  .rgPage .rgBar .rgT1{font-size:15pt;font-weight:bold;font-family:Calibri,Arial,sans-serif;}
+  .rgPage .rgBar .rgT2{font-size:7pt;font-weight:bold;}
+  .rgPage .rgRow{display:flex;border:1px solid #333;border-top:none;}
+  .rgPage .rgRow>div{padding:1mm 1.5mm;font-size:7pt;min-height:5.5mm;border-left:1px solid #333;overflow:hidden;}
+  .rgPage .rgRow>div:first-child{border-left:none;}
+  .rgPage .rgRow b{font-weight:normal;}
+  .rgPage .rgCont{border:1px solid #333;border-top:none;padding:1mm 1.5mm;font-size:6.8pt;min-height:15mm;line-height:1.3;}
+  .rgPage table.rgTab{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:0;border:1px solid #333;}
+  .rgPage table.rgTab th{background:#D9D9D9 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:1px solid #777;font-size:8pt;font-weight:bold;padding:1mm;height:6mm;}
+  .rgPage table.rgTab td{border:1px solid #999;font-size:8pt;height:7.4mm;padding:0 1.5mm;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .rgPage table.rgTab td.n{font-size:6pt;text-align:center;color:#444;}
+  .rgPage .rgObs{font-size:6pt;margin-top:1mm;line-height:1.35;}
+  .rgPage .rgObs .rgLista{float:right;font-size:7pt;font-weight:bold;}
   .qPrint{margin-bottom:14px;}
   .optPrint{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:2px 0 2px 12px;}
   .circle{width:14px;height:14px;border:1px solid #666;border-radius:50%;flex-shrink:0;margin-top:2px;}
@@ -100,7 +118,7 @@
         <div class="t2" id="onlineStatusBadge"></div>
         <div class="t2" id="offlineReadyBadge"></div>
         <div class="t2" id="connStatusBadge"></div>
-        <div class="t2" style="opacity:.7;font-size:10px;">Versão 22/10/2026-D</div>
+        <div class="t2" style="opacity:.7;font-size:10px;">Versão 29/10/2026-E</div>
       </div>
     </div>
     <div class="modeToggle" id="modeToggleWrap">
@@ -2436,6 +2454,49 @@ function renderImprimir(){
 }
 
 // ======================= PRINT LAYER =======================
+const RG_LOGO = "data:image/png;base64,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";
+// Anexo 01 — Registro de Treinamento (PGS-007572), A4 paisagem, 15 linhas por página.
+function rgListaPaginas(session, rows, rotulo, opts){
+  const dataSessao = (session.createdAt ? new Date(session.createdAt) : new Date()).toLocaleDateString("pt-BR");
+  const blank = !!(opts && opts.blank);
+  const POR_PAG = 15;
+  const total = Math.max(1, Math.ceil(rows.length / POR_PAG));
+  let out = "";
+  for(let p=0; p<total; p++){
+    const pedaco = rows.slice(p*POR_PAG, (p+1)*POR_PAG);
+    let trs = "";
+    for(let i=0;i<POR_PAG;i++){
+      const sub = pedaco[i];
+      const num = p*POR_PAG + i + 1;
+      if(sub){
+        const emp = (sub.empresa||"") + (sub.gerenciaSupervisao ? " — " + sub.gerenciaSupervisao : "");
+        trs += `<tr><td class="n">${num}</td><td>${esc(sub.matricula||"")}</td><td>${esc(sub.nome||"")}</td>
+          <td style="text-align:center;">${sub.assinatura ? `<img src="${sub.assinatura}" style="height:6mm;max-width:100%;">` : ""}</td>
+          <td>${esc(emp)}</td><td></td><td></td><td></td><td></td><td></td>
+          <td style="text-align:center;">${typeof sub.pct==="number" ? sub.pct.toFixed(1)+"%" : ""}</td></tr>`;
+      } else {
+        trs += `<tr><td class="n">${num}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      }
+    }
+    out += `<div class="rgPage" style="${(p<total-1 || (opts&&opts.quebra))?"page-break-after:always;break-after:page;":""}">
+      <div class="rgBar"><img src="${RG_LOGO}"><div class="rgTit"><div class="rgT1">Anexo 01 - Registro de Treinamento</div>
+        <div class="rgT2">PGS-007572 - Diretrizes para competência, treinamento e conscientização – Onça Puma (Rev.: 00 - 16/12/2025)</div></div></div>
+      <div class="rgRow"><div style="flex:6;"><b>Treinamento:</b> ${esc(session.title)}</div><div style="flex:3;"><b>Código do Treinamento:</b> ${esc(session.codigo||"")}</div><div style="flex:1;"><b>Turma:</b></div></div>
+      <div class="rgRow"><div style="flex:2;"><b>Período:</b> ${blank?"":dataSessao}</div><div style="flex:3;"><b>Local:</b> ${session.local?esc(session.local):""}</div><div style="flex:2;"><b>Horário:</b></div><div style="flex:3;"><b>Carga Horária:</b> ${esc(session.cargaHoraria||"")}</div></div>
+      <div class="rgRow"><div style="flex:7;"><b>Fonte/Instrutor:</b> ${session.instrutor?esc(session.instrutor):""}</div><div style="flex:3;"><b>Matrícula Instrutor:</b> ${session.instrutorMatricula?esc(session.instrutorMatricula):""}</div></div>
+      <div class="rgCont"><b style="font-weight:normal;">Conteúdo:</b> ${esc(session.conteudo||"")}</div>
+      <table class="rgTab"><colgroup><col style="width:3%"><col style="width:8%"><col style="width:21%"><col style="width:21%"><col style="width:26%"><col style="width:2.4%"><col style="width:2.4%"><col style="width:2.4%"><col style="width:2.4%"><col style="width:2.4%"><col style="width:9%"></colgroup>
+        <thead><tr><th rowspan="2">Nº</th><th rowspan="2">Matrícula</th><th rowspan="2">Nome (Legível)</th><th rowspan="2">Assinatura</th><th rowspan="2">Gerência / Empresa Contratada</th><th colspan="5">Dias</th><th rowspan="2">Nota</th></tr>
+        <tr><th style="height:4mm;"></th><th></th><th></th><th></th><th></th></tr></thead>
+        <tbody>${trs}</tbody></table>
+      <div class="rgObs">${rotulo?`<span class="rgLista">${esc(rotulo)}${total>1?` · Página ${p+1} de ${total}`:""}</span>`:""}Obs: (1) Fica facultativo o preenchimento do campo Turma e Nota.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(2) Para turmas e/ou conteúdos programáticos maiores, pode-se incluir mais linhas.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(3) Gerência/ Empresa Contratada: quando se tratar de contratada deve-se informar o nome da empresa.</div>
+    </div>`;
+  }
+  return out;
+}
+
 // Junta vários documentos em um só PDF: cada um começa numa página nova.
 // O navegador abre a janela de impressão; basta escolher "Salvar como PDF".
 function imprimirLote(jobs, aviso){
@@ -2556,80 +2617,27 @@ function buildPrintLayer(session, view, submission, opts){
     });
   } else if(view==="presenca-oficial"){
     const subs = STORE.submissions[session.id]||[];
-    const dataSessao = new Date(session.createdAt).toLocaleDateString("pt-BR");
     const filtro = (opts && opts.vinculo) || "todos";
-    html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Anexo 01 — Registro de Treinamento (lista oficial, preenchida automaticamente)</div>
-    <div class="printGrid">
-      <div><b>Treinamento:</b> ${esc(session.title)}</div>
-      <div><b>Código:</b> ${esc(session.codigo||"________________")}</div>
-      <div><b>Turno/Local:</b> ${session.local?esc(session.local):"________________"}</div>
-      <div><b>Período:</b> ${dataSessao}</div>
-      <div><b>Carga Horária:</b> ${esc(session.cargaHoraria||"________")}</div>
-      <div><b>Fonte/Instrutor:</b> ${session.instrutor?esc(session.instrutor):"________________________"}</div>
-      <div><b>Matrícula do instrutor:</b> ${session.instrutorMatricula?esc(session.instrutorMatricula):"________________"}</div>
-      ${session.conteudo?`<div><b>Conteúdo:</b> ${esc(session.conteudo)}</div>`:"<div></div>"}
-    </div>`;
-
-    const renderBloco = (titulo, lista, colLabel)=>{
-      let bloco = `<div style="font-size:12px;font-weight:bold;color:#0B1220;margin:14px 0 6px;text-transform:uppercase;">${titulo} — ${lista.length} participante(s)</div>
-      <table class="presTable"><thead><tr>
-        <th style="width:26px;">Nº</th><th style="width:85px;">Matrícula</th><th>Nome (Legível)</th>
-        <th style="width:100px;">Assinatura</th><th>${colLabel}</th><th style="width:45px;">Nota</th>
-      </tr></thead><tbody>`;
-      if(lista.length){
-        lista.forEach((sub,i)=>{
-          const empresaCol = sub.empresa + (sub.gerenciaSupervisao ? ` — ${sub.gerenciaSupervisao}` : "");
-          bloco += `<tr>
-            <td style="text-align:center;color:#888;">${i+1}</td>
-            <td>${esc(sub.matricula||"")}</td>
-            <td>${esc(sub.nome)}</td>
-            <td style="text-align:center;">${sub.assinatura ? `<img src="${sub.assinatura}" style="height:32px;max-width:95px;">` : ""}</td>
-            <td>${esc(empresaCol)}</td>
-            <td style="text-align:center;">${sub.pct.toFixed(1)}%</td>
-          </tr>`;
-        });
-      } else {
-        bloco += `<tr><td colspan="6" style="text-align:center;color:#888;padding:12px;">Nenhum participante nesta categoria.</td></tr>`;
-      }
-      bloco += `</tbody></table>`;
-      return bloco;
-    };
-
     const listaVale = subs.filter(x=>x.vinculo==="vale");
     const listaContratada = subs.filter(x=>x.vinculo==="contratada");
     const listaSemVinculo = subs.filter(x=>x.vinculo!=="vale" && x.vinculo!=="contratada");
-
-    if(filtro==="vale"){
-      html += renderBloco("Empregados Vale", listaVale, "Gerência");
-    } else if(filtro==="contratada"){
-      html += renderBloco("Empresas Contratadas", listaContratada, "Empresa Contratada");
-    } else {
-      html += renderBloco("Empregados Vale", listaVale, "Gerência");
-      html += renderBloco("Empresas Contratadas", listaContratada, "Empresa Contratada");
-      if(listaSemVinculo.length) html += renderBloco("Sem vínculo informado", listaSemVinculo, "Gerência / Empresa");
+    let paginas = "";
+    const blocos = [];
+    if(filtro==="vale") blocos.push(["Empregados Vale", listaVale]);
+    else if(filtro==="contratada") blocos.push(["Empresas Contratadas", listaContratada]);
+    else {
+      if(listaVale.length || !listaContratada.length) blocos.push(["Empregados Vale", listaVale]);
+      if(listaContratada.length) blocos.push(["Empresas Contratadas", listaContratada]);
+      if(listaSemVinculo.length) blocos.push(["Sem vínculo informado", listaSemVinculo]);
     }
-    html += `<div style="font-size:10px;color:#666;margin-top:8px;">Lista gerada automaticamente a partir das provas respondidas no Aptus — ${subs.length} registro(s) no total.</div>`;
+    blocos.forEach((b,i)=>{
+      paginas += rgListaPaginas(session, b[1], b[0], {quebra: i<blocos.length-1});
+    });
+    html = paginas;
   } else {
-    html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Anexo 01 — Registro de Treinamento</div>
-    <div class="printGrid">
-      <div><b>Treinamento:</b> ${esc(session.title)}</div>
-      <div><b>Código:</b> ${esc(session.codigo||"________________")}</div>
-      <div><b>Turno:</b> ________________</div>
-      <div><b>Período:</b> ____/____/________</div>
-      <div><b>Local:</b> ________________________</div>
-      <div><b>Horário:</b> ___________</div>
-      <div><b>Carga Horária:</b> ${esc(session.cargaHoraria||"________")}</div>
-      <div><b>Fonte/Instrutor:</b> ${session.instrutor?esc(session.instrutor):"________________________"}${session.instrutorMatricula?` (matr. ${esc(session.instrutorMatricula)})`:""}</div>
-      ${session.conteudo?`<div style="grid-column:1/3;"><b>Conteúdo:</b> ${esc(session.conteudo)}</div>`:""}
-    </div>
-    <table class="presTable"><thead><tr>
-      <th style="width:30px;">Nº</th><th style="width:90px;">Matrícula</th><th>Nome (Legível)</th>
-      <th style="width:120px;">Assinatura</th><th>Gerência / Empresa Contratada</th><th style="width:50px;">Nota</th>
-    </tr></thead><tbody>`;
-    for(let i=0;i<presencaRows;i++){
-      html += `<tr><td style="text-align:center;color:#888;">${i+1}</td><td></td><td></td><td></td><td></td><td></td></tr>`;
-    }
-    html += `</tbody></table>`;
+    // lista em branco para preencher à mão (mesmo modelo)
+    const vazias = new Array(Math.ceil((presencaRows||15)/15)*15).fill(null);
+    html = rgListaPaginas(session, vazias, "", {blank:true});
   }
   layer.innerHTML = html;
 }
